@@ -43,8 +43,10 @@ class MatcherNode::String does MatcherNode::Base {
             my $other-new = MatcherNode::String.new(str => $other.str.substr($first-mismatch), descendants => $other.descendants.flat, terminals => $other.terminals.flat);
             return MatcherNode::String.new(str => $.str.substr(0, $first-mismatch), descendants => [$self-new, $other-new], terminals => []);
         } elsif $.str.chars == $other.str.chars {
-            # Both strings are the same, so we should combine the two nodes into one master
-            # node. This is essentially a degenerate case. TODO: This probably needs to merge descendants.
+            # Both strings are the same, so we should combine the two nodes into one
+            # master node. This is essentially a degenerate case. TODO: This probably
+            # needs to merge descendants, but since one of the descendant lists is
+            # currently always empty, that's not really neccesary.
             say "Case 2";
             return MatcherNode::String.new(str => $.str, descendants => ($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
         } elsif $.str.chars < $other.str.chars {

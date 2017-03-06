@@ -1,3 +1,7 @@
 /foo/bar/baz.txt
+/foo/bar/baz.cxx
 /foo/bar/baz.cpp
 /foo/bar/baz.c
+/foo/bar/baz.c
+/foo/bar/baz.cppalready
+/foo/baz/bar.c

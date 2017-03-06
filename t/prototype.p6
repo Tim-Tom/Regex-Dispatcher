@@ -44,19 +44,39 @@ class MatcherNode::String does MatcherNode::Base {
             return MatcherNode::String.new(str => $.str.substr(0, $first-mismatch), descendants => [$self-new, $other-new], terminals => []);
         } elsif $.str.chars == $other.str.chars {
             # Both strings are the same, so we should combine the two nodes into one master
-            # node. This is essentially a degenerate case.
+            # node. This is essentially a degenerate case. TODO: This probably needs to merge descendants.
             say "Case 2";
-            return MatcherNode::String.new(str => $.str, descendants => ($.descendants, $other.descendants).flat, terminals => ($.terminals, $other.terminals).flat);
+            return MatcherNode::String.new(str => $.str, descendants => ($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
         } elsif $.str.chars < $other.str.chars {
             # We are a prefix of the other node. Chop the other string at the appropriate place.
             say "Case 3";
             my $descendant = MatcherNode::String.new(str => $other.str.substr($.str.chars), descendants => $other.descendants.flat, terminals => $other.terminals.flat);
-            return MatcherNode::String.new(str => $.str, descendants => ($.descendants.flat, $descendant).flat, terminals => $.terminals.flat);
+            my @descendants = $.descendants.flat;
+            my $already-merged = False;
+            for @descendants -> $d is rw {
+                if $d.can-merge($descendant) {
+                    $d = $d.merge($descendant);
+                    $already-merged = True;
+                    last;
+                }
+            }
+            @descendants.push($descendant) unless $already-merged;
+            return MatcherNode::String.new(str => $.str, descendants => @descendants, terminals => $.terminals.flat);
         } else {
             # They are a prefix of our node. Chop our string at the appropriate place.
             say "Case 4";
             my $descendant = MatcherNode::String.new(str => $.str.substr($other.str.chars), descendants => $.descendants.flat, terminals => $.terminals.flat);
-            return MatcherNode::String.new(str => $other.str, descendants => ($other.descendants.flat, $descendant).flat, terminals => $other.terminals.flat);
+            my @descendants = $other.descendants.flat;
+            my $already-merged = False;
+            for @descendants -> $d is rw {
+                if $d.can-merge($descendant) {
+                    $d = $d.merge($descendant);
+                    $already-merged = True;
+                    last;
+                }
+            }
+            @descendants.push($descendant) unless $already-merged;
+            return MatcherNode::String.new(str => $other.str, descendants => @descendants, terminals => $other.terminals.flat);
         }
     }
     method debug-print(Str $indent) {

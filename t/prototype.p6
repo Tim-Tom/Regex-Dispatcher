@@ -19,6 +19,33 @@ role MatcherNode::Base {
     method debug-print(Str $indent) { ... }
 }
 
+sub merge-descendants(@l, @r) {
+    my @descendants;
+    if @l == 0 {
+        @descendants = @r;
+    } elsif @r == 0 {
+        @descendants = @l
+    } else {
+        my @picked = @r.map({ False });
+        for @l -> $l {
+            my $picked = False;
+            for @r.kv -> $i, $r {
+                next if @picked[$i];
+                if $l.can-merge($r) {
+                    @descendants.push($l.merge($r));
+                    $picked = @picked[$i] = True;
+                    last;
+                }
+            }
+            @descendants.push($l) unless $picked;
+        }
+        for @r.kv -> $i, $r {
+            @descendants.push($r) unless @picked[$i];
+        }
+    }
+    return @descendants;
+}
+
 class MatcherNode::String does MatcherNode::Base {
     has Str $.str;
     method is-match($str) {
@@ -46,10 +73,7 @@ class MatcherNode::String does MatcherNode::Base {
             # master node. This is essentially a degenerate case. TODO: This probably
             # needs to merge descendants, but since one of the descendant lists is
             # currently always empty, that's not really neccesary.
-            if $.descendants.elems > 0 && $other.descendants.elems > 0 {
-                die "We don't handle this case properly.";
-            }
-            return MatcherNode::String.new(str => $.str, descendants => ($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
+            return MatcherNode::String.new(str => $.str, descendants => merge-descendants(@.descendants, @($other.descendants)), terminals => ($.terminals.flat, $other.terminals.flat).flat);
         } elsif $.str.chars < $other.str.chars {
             # We are a prefix of the other node. Chop the other string at the appropriate place.
             my $descendant = MatcherNode::String.new(str => $other.str.substr($.str.chars), descendants => $other.descendants.flat, terminals => $other.terminals.flat);
@@ -103,12 +127,7 @@ class MatcherNode::Any does MatcherNode::Base {
         return $other ~~ MatcherNode::Any;
     }
     method merge($other) {
-        # TODO: This probably needs to merge descendants, but since one of the descendant
-        # lists is currently always empty, that's not really neccesary.
-        if $.descendants.elems > 0 && $other.descendants.elems > 0 {
-            die "We don't handle this case properly.";
-        }
-        return MatcherNode::Any.new(descendants => ($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
+        return MatcherNode::Any.new(descendants => merge-descendants($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
     }
     method debug-print(Str $indent) {
         if @.terminals > 0 {
@@ -187,7 +206,7 @@ for $*IN.lines.kv -> $line-no, $line {
 }
 
 $matcher.merge(MatcherNode::String.new(str => '/foo', descendants => [MatcherNode::Any.new(descendants => [MatcherNode::String.new(str => 'bar/baz.txt', terminals => ['first'])])]));
-$matcher.merge(MatcherNode::String.new(str => '/foo/bar', descendants => [MatcherNode::Except.new(char => '/', descendants => [MatcherNode::String.new(str => 'baz.txt', terminals => ['second'])])]));
+$matcher.merge(MatcherNode::String.new(str => '/foo', descendants => [MatcherNode::Except.new(char => '/', descendants => [MatcherNode::String.new(str => 'bar/baz.txt', terminals => ['second'])])]));
 
 $matcher.debug-print('');
 
@@ -195,4 +214,4 @@ say '---';
 .say for gather $matcher.match('/foo/bar/baz.txt');
 
 say '===';
-.say for gather $matcher.match('/foo/bar_baz.txt');
+.say for gather $matcher.match('/foo_bar/baz.txt');

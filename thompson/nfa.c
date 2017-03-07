@@ -345,13 +345,13 @@ step(List *clist, int c, List *nlist)
         }
 }
 
-void printstate(State* s) {
+void print_state(State* s) {
   if (s->c < 256) {
-    printf("[%c %p]\n", s->c, s->out);
+    printf("[%p: %c %p]\n", s, s->c, s->out);
   } else if (s->c == 256) {
-    printf("[M %p %p %d]\n", s->out, s->out1, s->lastlist);
+    printf("[%p: M %p %p]\n", s, s->out, s->out1);
   } else if (s->c == 257) {
-    printf("[S %p %p %d]\n", s->out, s->out1, s->lastlist);
+    printf("[%p: S %p %p]\n", s, s->out, s->out1);
   } else {
     printf("Huh?\n");
   }
@@ -370,28 +370,21 @@ void print_states(State* s) {
     }
   }
   print_seen[seen_count++] = s;
+  print_state(s);
   if (s->c < 256) {
-    printf("[%p: %c %p]\n", s, s->c, s->out);
     print_states(s->out);
-  }else if (s->c == 256) {
-    printf("[%p: M %p %p]\n", s, s->out, s->out1);
+  } else if (s->c == 256 || s->c == 257) {
     print_states(s->out);
     print_states(s->out1);
-  } else if (s->c == 257) {
-    printf("[%p: S %p %p]\n", s, s->out, s->out1);
-    print_states(s->out);
-    print_states(s->out1);
-  } else {
-    printf("Huh?\n");
   }
 }
 
 int step_c = 0;
-void printlist(List* l) {
+void print_list(List* l) {
   int i;
   printf("---Step: %d, %d States---\n", ++step_c, l->n);
   for(i = 0; i < l->n; ++i) {
-    printstate(l->s[i]);
+    print_state(l->s[i]);
   }
 }
 
@@ -405,10 +398,12 @@ match(State *start, char *s)
         clist = startlist(start, &l1);
         nlist = &l2;
         for(; *s; s++){
+          print_list(clist);
                 c = *s & 0xFF;
                 step(clist, c, nlist);
                 t = clist; clist = nlist; nlist = t;	/* swap clist, nlist */
         }
+        print_list(clist);
         return ismatch(clist);
 }
 

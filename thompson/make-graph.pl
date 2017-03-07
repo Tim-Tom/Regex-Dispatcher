@@ -16,6 +16,7 @@ sub ms {
 my $transitions = '';
 
 while(<STDIN>) {
+  last if /---/;
   /^\[([^:]+): ([a-zA-Z]) (\S+)(?: (\S+))?\]$/ or die;
   my $state = ms $1;
   if ($2 eq 'M') {

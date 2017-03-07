@@ -3,5 +3,7 @@
 /foo/bar/baz.cpp
 /foo/bar/baz.c
 /foo/bar/baz.c
-/foo/bar/baz.cppalready
 /foo/baz/bar.c
+/foo/baz/monkey
+/foo/cat/monkey
+hello world

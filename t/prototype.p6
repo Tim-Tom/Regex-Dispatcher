@@ -4,7 +4,9 @@ role MatcherNode::Base {
     has @.descendants;
     has @.terminals;
     method is-match(Str:D $str) returns Str { ... }
-    method can-merge(MatcherNode::Base:D $other) returns Bool { ... }
+    multi method can-merge(MatcherNode::Base:D $other) returns Bool {
+        return False;
+    }
     method merge(MatcherNode::Base:D $other) returns MatcherNode::Base { ... }
     method match(Str:D $str) {
         my $match = $.is-match($str);
@@ -47,7 +49,7 @@ sub merge-descendants(@l, @r) {
 }
 
 class MatcherNode::String does MatcherNode::Base {
-    has Str $.str;
+    has Str $.str is required;
     method is-match($str) {
         if ($str.starts-with($.str)) {
             return $str.substr($.str.chars);
@@ -55,8 +57,7 @@ class MatcherNode::String does MatcherNode::Base {
             return Str;
         }
     }
-    method can-merge($other) {
-        return False unless $other ~~ MatcherNode::String;
+    multi method can-merge(MatcherNode::String:D $other) {
         return $.str.substr(0, 1) eq $other.str.substr(0, 1);
     }
     method merge($other) {
@@ -116,15 +117,41 @@ class MatcherNode::String does MatcherNode::Base {
     }
 }
 
-class MatcherNode::CharacterRange {
+class MatcherNode::CharacterRange does MatcherNode::Base {
+    has Str $.low is required;
+    has Str $.high is required;
+    method is-match($str) {
+        if ($.low le $str.substr(0, 1) le $.high) {
+            return $str.substr(1);
+        } else {
+            return Str;
+        }
+    }
+    multi method can-merge(MatcherNode::CharacterRange:D $other) {
+        return $.low eq $other.low && $.high eq $other.high;
+    }
+    method merge($other) {
+        return MatcherNode::Any.new(high => $.high, low => $.low, descendants => merge-descendants($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
+    }
+
+    method debug-print(Str $indent) {
+        if @.terminals > 0 {
+            say "$indent\{^$.low-$.high} [$.terminals]";
+        } else {
+            say "$indent\{^$.low-$.high}";
+        }
+        for @.descendants -> $d {
+            $d.debug-print($indent ~ '     |');
+        }
+    }
 }
 
 class MatcherNode::Any does MatcherNode::Base {
     method is-match($str) {
         return $str.substr(1);
     }
-    method can-merge($other) {
-        return $other ~~ MatcherNode::Any;
+    multi method can-merge(MatcherNode::Any:D $other) {
+        return False;
     }
     method merge($other) {
         return MatcherNode::Any.new(descendants => merge-descendants($.descendants.flat, $other.descendants.flat).flat, terminals => ($.terminals.flat, $other.terminals.flat).flat);
@@ -147,8 +174,7 @@ class MatcherNode::Except does MatcherNode::Base {
         return Str if $str.substr(0, 1) eq $.char;
         return $str.substr(1);
     }
-    method can-merge($other) {
-        return False unless $other ~~ MatcherNode::Except;
+    multi method can-merge(MatcherNode::Except:D $other) {
         return $.char eq $other.char;
     }
     method merge($other) {
@@ -167,16 +193,13 @@ class MatcherNode::Except does MatcherNode::Base {
         }
         for @.descendants -> $d {
             $d.debug-print($indent ~ '   |');
-        }        
+        }
     }
 }
 
 class MatcherNode::Root does MatcherNode::Base {
     method is-match($str) {
         return $str;
-    }
-    method can-merge($other) {
-        die 'Unsupported';
     }
     method merge($self: $other) {
         my $already-merged = False;
@@ -207,6 +230,7 @@ for $*IN.lines.kv -> $line-no, $line {
 
 $matcher.merge(MatcherNode::String.new(str => '/foo', descendants => [MatcherNode::Any.new(descendants => [MatcherNode::String.new(str => 'bar/baz.txt', terminals => ['first'])])]));
 $matcher.merge(MatcherNode::String.new(str => '/foo', descendants => [MatcherNode::Except.new(char => '/', descendants => [MatcherNode::String.new(str => 'bar/baz.txt', terminals => ['second'])])]));
+$matcher.merge(MatcherNode::String.new(str => '/foo/bar/', descendants => [MatcherNode::CharacterRange.new(low => 'a', high => 'z', descendants => [MatcherNode::String.new(str => 'ar/baz.txt', terminals => ['third'])])]));
 
 $matcher.debug-print('');
 
